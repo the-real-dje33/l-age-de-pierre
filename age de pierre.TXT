@@ -1,0 +1,158 @@
+10 REM -------------------------------
+20 REM ***    L'AGE DE PIERRE      ***
+30 REM ***  elabore sur un CPC 464 ***
+40 REM -------------------------------
+50 REM ***  (C) 1985, par Stephane ***
+60 REM *** Vallois.tel:46-04-04-17 ***
+70 REM -------------------------------
+80 REM 
+90 sc=0:BORDER 0
+100 DEF FN z$=LEFT$(a$(y),x-1)+CHR$(32)+RIGHT$(a$(y),20-x)
+110 DEF FN y$=MID$(a$(y-1),x,1):ENV 1,127,-100,20
+120 ENT 2,100,2,2:ecr=0:DIM a$(13)
+130 SYMBOL 255,&CF,&CF,&CF,0,&F3,&F3,&F3,0
+140 SYMBOL 254,&7F,&FF,&C3,&BF,&BF,&BF,&BF,&FF
+150 SYMBOL 253,&FC,&FE,&FE,&FE,&FE,&FE,&FE,&FE
+160 SYMBOL 252,&FF,&FF,&FF,&FF,&FF,&FF,&7F,0
+170 SYMBOL 251,&FE,&FE,&FE,&FE,&FE,&FE,&FC,0
+180 SYMBOL 250,7,&1F,&3F,&7F,&7F,255,255,255
+190 SYMBOL 249,&E0,&F8,&FC,&FE,&FE,255,255,255
+200 SYMBOL 248,255,255,&CF,&47,&63,&33,&1F,&7
+210 SYMBOL 247,255,255,255,254,254,&FC,&F8,&E0
+220 SYMBOL 246,7,9,15,15,7,1,15,&17
+230 SYMBOL 245,&E0,&90,&F0,&F0,&E0,&80,&F0,&E8
+240 SYMBOL 244,&33,&31,&33,&26,&C,&18,&C,&1C
+250 SYMBOL 243,&CC,&8C,&CC,&64,&30,&18,&30,&38
+260 INK 0,0:INK 1,18:INK 2,6:INK 3,24:GOSUB 1500:MODE 1
+270 PAPER 0:PEN 1:BORDER 0
+280 GOTO 1380
+290 REM -------------------------------
+300 REM *** Donnees du tableau n.1  ***
+310 REM -------------------------------
+320 DATA mmmmmmmmmmmmmmmmmmmm
+330 DATA m hrhhmmmmrrrmrmmmrm
+340 DATA mhhhmpr mhhhhmp  hrm
+350 DATA mrrhmmp mp  h   m rm
+360 DATA mpphhhh mmm hmmrrhrm
+370 DATA mhhhhhh rhmphmphhhrm
+380 DATA mhmmmmmmrhmrrrrrrhrm
+390 DATA mhmhhhhhmmmmmmmmmhrm
+400 DATA mhmhphphprrrrrrrrhrm
+410 DATA mhr  hhhhphphphphhrm
+420 DATA mhrhphphprrrrrrrrrrm
+430 DATA mmmmmmmmmmmmmmmmmmmm
+440 DATA 18,150,2,2
+450 DATA mmmmmmmmmmmmmmmmmmmm
+460 DATA mrrmmmmmmmmmrrrrmrrm
+470 DATA m hmmmmmmmmmmmmhrprm
+480 DATA m hmmp p p  pppppprm
+490 DATA m hmm p p mmrrrhrprm
+500 DATA m hmmp p pmmrmmmrprm
+510 DATA mhhmmmmmmmmmrppmrprm
+520 DATA m hmmmmmmmmmmhrrmprm
+530 DATA mhhrrrhhhr  hhhhhprm
+540 DATA m hhhhhhhhmmrrrrrrrm
+550 DATA mhhrrrrrrrmmmmmmmmmm
+560 DATA mmmmmmmmmmmmmmmmmmmm
+570 DATA 22,80,2,3
+580 DATA mmmmmmmmmmmmmmmmmmmm
+590 DATA mm r  hr r mrmmr  rm
+600 DATA mmmpmmhhmh mprhhhhhm
+610 DATA m hhhhhrhr hhhmmm  m
+620 DATA mmmpmmhrhr mmmmrrm m
+630 DATA mm r  hrhr hhhhhhhpm
+640 DATA m hhhhhrhr mmmmmmmmm
+650 DATA mm r  hrhr rrrrrrrrm
+660 DATA mmmpmmhrhr hhhhhhhpm
+670 DATA mphhhhhrhr mmmmmmmmm
+680 DATA mrrrrrhrhr hhhhhhhpm
+690 DATA mmmmmmmmmm mmmmmmmmm
+700 DATA 8,150,2,4
+710 DATA mmmmmmmmmmmmmmmmmmmm
+720 DATA m hhhhhhrrrhhhhhhhhm
+730 DATA mhhhhhhhhhprmmmmmmhm
+740 DATA mphhhhhhrrhprmmmmmhm
+750 DATA mrphhhhhmmrhprmmmhhm
+760 DATA mrrphhhhhhmrhprmhphm
+770 DATA mrrrphhhpphmrhprmhhm
+780 DATA mrrrrphhmmphmrhprmmm
+790 DATA mrrrrrphppmphmrhprmm
+800 DATA mrrrrrrphhpmphmrhprm
+810 DATA mrrrrrrrmmhpmphhr hm
+820 DATA mmmmmmmmmmmmmmmmmmmm
+830 DATA 26,80,2,2
+840 '---------------------------------
+850 '*** ROUTINE D'AFFICHAGE ECRAN ***
+860 '---------------------------------
+870 FOR i=1 TO 12:READ a$(i)
+880 FOR j=1 TO 20:b$=MID$(a$(i),j,1)
+890 IF b$="m" THEN PEN 2:c$=STRING$(4,CHR$(255))
+900 IF b$="h" THEN PEN 1:c$=STRING$(4,CHR$(207))
+910 IF b$=" " THEN c$=STRING$(4," ")
+920 IF b$="r" THEN PEN 3:c$=CHR$(254)+CHR$(253)+CHR$(252)+CHR$(251)
+930 IF b$="p" THEN PEN 2:c$=CHR$(250)+CHR$(249)+CHR$(248)+CHR$(247)
+940 LOCATE j*2-1,i*2-1:PRINT MID$(c$,1,2):LOCATE j*2-1,i*2:PRINT MID$(c$,3,2);
+950 NEXT j:NEXT i:READ pom,tps,x,y
+960 PEN 3:PRINT "SCORE:";USING "#####";sc;:PRINT "       ENERGIE:";USING "###";tps;:PRINT "  POMMES:";USING "##";pom;
+970 PEN 3:LOCATE x*2-1,y*2-1:PRINT CHR$(246);CHR$(245):LOCATE x*2-1,y*2:PRINT CHR$(244);CHR$(243):RETURN
+980 REM ------------------------------
+990 REM ***  ANIMATION DU MONSTRE  ***
+1000 REM -----------------------------
+1010 b$=INKEY$:IF b$="" THEN 1010
+1020 IF b$<CHR$(240) OR b$>CHR$(243) THEN 1010 ELSE LOCATE x*2-1,y*2-1:PRINT "  ":LOCATE x*2-1,y*2:PRINT "  "
+1030 GOSUB 1360:ON (ASC(b$)-239) GOSUB 1040,1090,1150,1210:GOTO 1140
+1040 c$=MID$(a$(y-1),x,1):tb=0
+1050 IF c$=" " THEN y=y-1:RETURN
+1060 IF c$="h" THEN y=y-1:a$(y)=FN z$:RETURN
+1070 IF c$="p" THEN y=y-1:GOSUB 1270:a$(y)=FN z$:RETURN
+1080 RETURN
+1090 c$=MID$(a$(y+1),x,1):IF FN y$="r" THEN tb=1:x1=x:y1=y ELSE tb=0
+1100 IF c$=" " THEN y=y+1:RETURN
+1110 IF c$="h" THEN y=y+1:a$(y)=FN z$:RETURN
+1120 IF c$="p" THEN y=y+1:GOSUB 1270:a$(y)=FN z$:RETURN
+1130 tb=0:RETURN
+1140 PEN 3:LOCATE x*2-1,y*2-1:PRINT CHR$(246);CHR$(245):LOCATE x*2-1,y*2:PRINT CHR$(244);CHR$(243):IF tb=0 THEN 1010 ELSE GOSUB 1280:GOTO 1010
+1150 c$=MID$(a$(y),x-1,1):IF FN y$="r" THEN tb=1:x1=x:y1=y: ELSE tb=0
+1160 IF c$=" " THEN x=x-1:RETURN
+1170 IF c$="h" THEN x=x-1:a$(y)=FN z$:RETURN
+1180 IF c$="p" THEN x=x-1:GOSUB 1270:a$(y)=FN z$:RETURN
+1190 IF c$="r" THEN GOTO 1350
+1200 tb=0:RETURN
+1210 c$=MID$(a$(y),x+1,1):IF FN y$="r" THEN tb=1:x1=x:y1=y: ELSE tb=0
+1220 IF c$=" " THEN x=x+1:RETURN
+1230 IF c$="h" THEN x=x+1:a$(y)=FN z$:RETURN
+1240 IF c$="p" THEN x=x+1:GOSUB 1270:a$(y)=FN z$:RETURN
+1250 IF c$="r" THEN GOTO 1340
+1260 tb=0:RETURN
+1270 sc=sc+150:SOUND 129,50,100,7,1:pom=pom-1:PEN 3:LOCATE 7,25:PRINT USING "#####";sc;:LOCATE 39,25:PRINT USING "##";pom;:IF pom=0 THEN 1430 ELSE RETURN
+1280 tb=0
+1290 IF MID$(a$(y1),x1,1)<>" " THEN SOUND 130,200,100,7,1,2,5:RETURN
+1300 PEN 3:LOCATE x1*2-1,y1*2-3:PRINT "  ":LOCATE x1*2-1,y1*2-2:PRINT "  "
+1310 a$(y1-1)=LEFT$(a$(y1-1),x1-1)+CHR$(32)+RIGHT$(a$(y1-1),20-x1):a$(y1)=LEFT$(a$(y1),x1-1)+"r"+RIGHT$(a$(y1),20-x1):LOCATE x1*2-1,y1*2-1:PRINT CHR$(254);CHR$(253):LOCATE x1*2-1,y1*2:PRINT CHR$(252);CHR$(251)
+1320 IF x1=x AND y1=y THEN 1570
+1330 y1=y1+1:GOTO 1290
+1340 IF MID$(a$(y),x+2,1)=" " THEN PEN 3:LOCATE x*2+1,y*2-1:PRINT "  ";CHR$(254);CHR$(253):LOCATE x*2+1,y*2:PRINT "  ";CHR$(252);CHR$(251):a$(y)=LEFT$(a$(y),x)+CHR$(32)+"r"+RIGHT$(a$(y),18-x):x1=x+2:y1=y+1:GOSUB 1210:GOTO 1280:ELSE RETURN
+1350 IF MID$(a$(y),x-2,1)=" " THEN PEN 3:LOCATE x*2-5,y*2-1:PRINT CHR$(254);CHR$(253);"  ":LOCATE x*2-5,y*2:PRINT CHR$(252);CHR$(251);"  ":a$(y)=LEFT$(a$(y),x-3)+"r"+CHR$(32)+RIGHT$(a$(y),21-x):x1=x-2:y1=y+1:GOSUB 1150:GOTO 1280:ELSE RETURN
+1360 tps=tps-1:PEN 3:LOCATE 27,25:PRINT USING "###";tps;:IF tps>0 THEN RETURN
+1370 GOTO 1570
+1380 ' -------------------------------
+1390 ' *** Gestion du programme !  ***
+1400 ' -------------------------------
+1410 ecr=ecr+1:IF ecr=5 THEN GOTO 1440
+1420 GOSUB 840:GOTO 980
+1430 CLS:GOTO 1410
+1440 ' sp gagne
+1450 MODE 0:PEN 3
+1460 PRINT "* VOUS AVEZ GAGNE *"
+1470 ZONE 80:PRINT ,"Vous etes le premier qui ait reussi cet  exploit. Nous nous souviendrons de vouscomme etant  LE SEULhero de l'histoire !","Une touche...":PRINT "Et ca repart !!!","Votre score:";sc
+1480 IF INKEY$<>"" THEN 1480
+1490 IF INKEY$<>"" THEN RUN ELSE 1490
+1500 MODE 2:PEN 3:LOCATE 32,5:PRINT "L'AGE DE PIERRE"
+1510 ZONE 80:PRINT ,"LE BUT DU JEU: Vous devez au travers de 4 salles guider un personnage dont la   seule raison d'etre est de ramasser les fruits rouges tapissant le sol.",,"TOUTEFOIS: Sa quete ne sera pas sans danger,car frequents sont les eboulements.
+1520 PRINT ,"DEROULEMENT DE LA PARTIE: Vous vous dirigez grace aux fleches du curseur, chaquedeplacement occasionnant la perte d'un point d'energie.Bien evidemment, si votretotal energetique parvient a zero, vous mourrez et la partie se termine.
+1530 PRINT "Chaque fois que vous passez sous une pierre celle ci tombe.Vous avez la possibi-lite de pousser un de ces blocs si il y a de la place derriere.","L'herbe ne fait pas obstacle a vos mouvements,elle sert a retenir les pierres.
+1540 PRINT ,"Pressez la barre d'espacement pour jouer, ou 'D' pour voir les 4 salles ..."
+1550 IF INKEY(61)=0 THEN 1580
+1560 IF INKEY(47)=0 THEN RETURN ELSE 1550
+1570 SOUND 130,200,100,7,1,2,5:FOR i=1 TO 1000:NEXT i:CLS:PEN 3:PRINT "Vous avez perdu !!!":FOR i=1 TO 10:SOUND 1,i*100,10,INT(i/3):SOUND 2,1000-i*100,10,7:NEXT:FOR i=1 TO 1000:NEXT:RUN
+1580 MODE 1:FOR z=1 TO 4:GOSUB 840:NEXT z:RUN
