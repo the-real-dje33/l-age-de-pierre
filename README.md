@@ -43,8 +43,8 @@ https://the-real-dje33.github.io/l-age-de-pierre/
 ### Screenshots
 
 <p align="center">
-  <img src=""img1.png"" alt="Capture 1"/>
-  <img src=""img1.png"" alt="Capture 2"/>
+  <img src="img1.png" alt="Capture 1"/>
+  <img src="img1.png" alt="Capture 2"/>
 </p>
 
 ### Structure du projet
@@ -95,15 +95,14 @@ The player explores a level, avoids traps, collects items, and progresses throug
 
 The project is available through GitHub Pages:
 
-```text
 https://the-real-dje33.github.io/l-age-de-pierre/
-```
+
 
 ### Screenshots
 
 <p align="center">
-  <img src=""img1.png"" alt="Capture 1"/>
-  <img src=""img1.png"" alt="Capture 2"/>
+  <img src="img1.png" alt="Capture 1"/>
+  <img src="img1.png" alt="Capture 2"/>
 </p>
 
 ### Project structure
@@ -131,8 +130,8 @@ Thanks to the Amstrad CPC community, CPC-Power, and everyone who helped preserve
 
 ## GitHub
 
-- Dépôt GitHub : (https://github.com/the-real-dje33/l-age-de-pierre)
-- GitHub repository: (https://github.com/the-real-dje33/l-age-de-pierre)
+- Dépôt GitHub : https://github.com/the-real-dje33/l-age-de-pierre
+- GitHub repository: https://github.com/the-real-dje33/l-age-de-pierre
 
 ---
 
