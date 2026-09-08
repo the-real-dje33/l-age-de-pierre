@@ -44,7 +44,7 @@ https://the-real-dje33.github.io/l-age-de-pierre/
 
 <p align="center">
   <img src="img1.png" alt="Capture 1"/>
-  <img src="img1.png" alt="Capture 2"/>
+  <img src="img2.png" alt="Capture 2"/>
 </p>
 
 ### Structure du projet
@@ -102,7 +102,7 @@ https://the-real-dje33.github.io/l-age-de-pierre/
 
 <p align="center">
   <img src="img1.png" alt="Capture 1"/>
-  <img src="img1.png" alt="Capture 2"/>
+  <img src="img2.png" alt="Capture 2"/>
 </p>
 
 ### Project structure
