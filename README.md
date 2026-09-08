@@ -35,10 +35,7 @@ Le joueur explore un niveau, évite les pièges, collecte des objets et progress
 ### Accès au jeu
 
 Le projet est accessible via GitHub Pages :
-
-```text
 https://the-real-dje33.github.io/l-age-de-pierre/
-```
 
 ### Screenshots
 
