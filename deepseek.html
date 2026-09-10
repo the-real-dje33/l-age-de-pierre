@@ -167,94 +167,142 @@ const state = {
 };
 
 /* ================================================================
-   AUDIO — Émulation AY-3-8912
+   AUDIO — Émulation AY-3-8912 (CPC : clock 1 MHz, prescaler 16)
+   ----------------------------------------------------------------
+   Formule : fréquence (Hz) = 1000000 / (16 × tone_period)
+                            = 62500 / tone_period
+   
+   Exemples issus du BASIC :
+     SOUND 129,50,100,7,1  -> tone=50  -> 1250 Hz (bip aigu court)
+     SOUND 130,200,100,7,1,2,5 -> tone=200 -> 312 Hz + bruit
+     SOUND 1,i*100,10,...  -> i*100 -> de 625 Hz à 62,5 Hz
+     SOUND 2,1000-i*100,10,7 -> 1000-i*100 -> de 69 Hz à (très aigu)
+   
+   Enveloppe matérielle (ENV 1,127,-100,20) :
+     - start = 127 (volume max)
+     - step  = -100 par tick
+     - 1 tick = 1/100 sec = 10 ms
+     - volume : 127 -> 27 -> 0 en 20 ms
+   Donc chaque son est un "tac" très bref, pas une note tenue.
    ================================================================ */
 let audioCtx = null;
 function ensureAudio(){
   if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-}
-function tonePeriodToFreq(p){
-  if(p <= 0) return 0;
-  return 125000 / p;
-}
-function ayVolToGain(v){
-  return Math.min(1, v / 15);
+  if(audioCtx.state === 'suspended') audioCtx.resume();
 }
 
-function playAY(channel, toneP, durMs, vol, envStart, envStep, envSteps){
+// AY tone period -> fréquence Hz (formule exacte CPC)
+function tpToFreq(tp){
+  if(tp <= 0) return 40000; // silencieux/inaudible
+  return 62500 / tp;
+}
+
+// Volume AY 0-15 -> gain linéaire approximatif (courbe logarithmique réaliste)
+const VOL_TABLE = [
+  0.000, 0.0015, 0.003, 0.005, 0.008, 0.012, 0.018, 0.026,
+  0.038, 0.055, 0.080, 0.115, 0.165, 0.235, 0.340, 0.500
+];
+function ayGain(v){
+  if(v < 0) v = 0;
+  if(v > 15) v = 15;
+  return VOL_TABLE[Math.round(v)];
+}
+
+/* --- Primitive : joue un ton carré + optionnel bruit AY,
+       avec une enveloppe percussive (attaque 2 ms, decay rapide) --- */
+function ayTone(tp, durMs, vol, noisePeriod){
   ensureAudio();
   const now = audioCtx.currentTime;
-  const freq = tonePeriodToFreq(toneP);
-  const totalDur = durMs / 1000;
+  const dur = durMs / 1000;
 
+  // Canal tonal
   const osc = audioCtx.createOscillator();
   osc.type = 'square';
-  osc.frequency.value = freq;
+  osc.frequency.value = tpToFreq(tp);
 
-  const gain = audioCtx.createGain();
-  // Boost global pour être bien audible
-  const baseVol = ayVolToGain(vol) * 1.4;
-  const startVol = ayVolToGain(envStart !== undefined ? envStart : vol);
-
-  gain.gain.setValueAtTime(startVol * baseVol, now);
-
-  if(envStep !== undefined && envSteps !== undefined){
-    const envN = envSteps;
-    const envStepMs = 10;
-    let v = startVol;
-    for(let i = 1; i <= envN; i++){
-      v = Math.max(0, v + (envStep/15));
-      gain.gain.linearRampToValueAtTime(
-        Math.max(0, v * baseVol),
-        now + i * envStepMs / 1000
-      );
-      if(v <= 0) break;
-    }
-  } else {
-    gain.gain.exponentialRampToValueAtTime(0.001, now + totalDur);
-  }
-  gain.gain.setValueAtTime(0, now + totalDur);
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start(now);
-  osc.stop(now + totalDur + 0.02);
-}
-
-// SOUND 129,50,100,7,1 -> manger (tone=50 -> 2500 Hz)
-function playEat(){
-  playAY(0, 50, 100, 7, 15, -100/127*15, 2);
-}
-
-// SOUND 130,200,100,7,1,2,5 -> clac de pierre / mort (tone=200 -> 625 Hz + bruit)
-function playRockStop(){
-  playAY(0, 200, 100, 7, 15, -100/127*15, 2);
-  ensureAudio();
-  const now = audioCtx.currentTime;
-  const buf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.1), audioCtx.sampleRate);
-  const data = buf.getChannelData(0);
-  for(let i=0;i<data.length;i++){
-    data[i] = (Math.random()*2-1) * Math.exp(-i/data.length*5);
-  }
-  const src = audioCtx.createBufferSource();
-  src.buffer = buf;
   const g = audioCtx.createGain();
-  g.gain.value = 0.25;
-  src.connect(g); g.connect(audioCtx.destination);
-  src.start(now);
+  const peak = ayGain(vol);
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(peak, now + 0.002);   // attaque 2 ms
+  g.gain.exponentialRampToValueAtTime(0.0001, now + dur); // decay rapide
+
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + dur + 0.02);
+
+  // Canal bruit (si demandé)
+  if(noisePeriod !== undefined && noisePeriod > 0){
+    const nDur = dur;
+    const buf = audioCtx.createBuffer(1, Math.max(1, Math.floor(audioCtx.sampleRate * nDur)), audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    // Bruit filtré selon le noise period (période basse = bruit plus aigu)
+    const nf = tpToFreq(noisePeriod);
+    const periodSamples = Math.max(1, Math.round(audioCtx.sampleRate / nf));
+    let seed = 12345;
+    let counter = 0, sample = 0;
+    for(let i=0;i<data.length;i++){
+      if(counter <= 0){
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        sample = (seed / 0x7fffffff) * 2 - 1;
+        counter = periodSamples;
+      }
+      data[i] = sample;
+      counter--;
+    }
+    const nSrc = audioCtx.createBufferSource();
+    nSrc.buffer = buf;
+    const nG = audioCtx.createGain();
+    const nPeak = ayGain(Math.min(vol, 10)) * 0.35;
+    nG.gain.setValueAtTime(0, now);
+    nG.gain.linearRampToValueAtTime(nPeak, now + 0.002);
+    nG.gain.exponentialRampToValueAtTime(0.0001, now + nDur);
+    nSrc.connect(nG).connect(audioCtx.destination);
+    nSrc.start(now);
+    nSrc.stop(now + nDur + 0.02);
+  }
 }
 
-// Séquence de mort (SOUND 1,i*100,10,... + SOUND 2,1000-i*100,10,...)
+/* ============================================================
+   SONS DU JEU (traduction fidèle des SOUND du BASIC)
+   ============================================================ */
+
+// Manger une pomme (ligne 1270) : SOUND 129,50,100,7,1
+//   tone=50 -> 1250 Hz, envelope 1 = 20 ms effectif, volume 7
+function playEat(){
+  ayTone(50, 0.028, 7);   // 28 ms : court et percussif
+}
+
+// Clac de pierre / impact de mort (lignes 1290 et 1570) :
+//   SOUND 130,200,100,7,1,2,5 -> tone=200 (312 Hz) + noise period 2
+function playRockStop(){
+  ayTone(200, 0.060, 7, 2);
+}
+
+// Mélodie de mort (ligne 1570) :
+//   FOR i=1 TO 10
+//     SOUND 1,i*100,10,INT(i/3)  -> sweep tonal descendant
+//     SOUND 2,1000-i*100,10,7    -> sweep tonal montant (canal 2)
+//   NEXT
+//   Chaque itération dure 100 ms (durée 10 * 10ms, non affectée par l'enveloppe)
 function playLose(){
   ensureAudio();
-  for(let i=1;i<=10;i++){
-    setTimeout(()=>{
-      playAY(0, i*100, 100, Math.max(1, Math.floor(i/3)));
-    }, i*80);
-    setTimeout(()=>{
-      playAY(1, 1000-i*100, 100, 7);
-    }, i*80 + 40);
+  for(let i = 1; i <= 10; i++){
+    const tone1 = i * 100;                        // 100..1000
+    const tone2 = Math.max(1, 1000 - i * 100);    // 900..1
+    const vol1  = Math.floor(i / 3);              // 0,0,1,1,1,2,2,2,3,3
+    const delay = (i - 1) * 100;                  // 100 ms entre itérations
+
+    setTimeout(() => {
+      if(vol1 > 0) ayTone(tone1, 0.100, vol1);
+      ayTone(tone2, 0.100, 7);
+    }, delay);
   }
+}
+
+// Séquence complète de mort (impact + pause + mélodie), comme lignes 1570
+function playDeathSequence(){
+  playRockStop();              // SOUND 130,200,... (impact)
+  setTimeout(()=>playLose(), 250); // FOR i=1 TO 1000 : NEXT ~ 200 ms
 }
 
 /* ---------- Rendu ---------- */
@@ -341,19 +389,16 @@ function nextRoomOrWin(){
 }
 
 /* Fait tomber une pierre située en (rx, ry) tant qu'elle a de la place en dessous.
-   Joue le son d'impact "clac" quand la pierre s'arrête (BASIC ligne 1290).
-   Retourne true si le joueur a été écrasé. */
+   Émule la routine 1280-1330 du BASIC. */
 function rockFalls(rx, ry){
-  // Boucle de chute (BASIC 1290-1330)
   while(getCell(rx, ry + 1) === ' '){
     setCell(rx, ry, ' ');
     ry++;
     setCell(rx, ry, 'r');
-    // Si la pierre atteint le joueur -> mort (BASIC 1320 -> 1570)
+    // Si la pierre atteint le joueur -> mort (BASIC ligne 1320 -> 1570)
     if(rx === state.x && ry === state.y){
-      playRockStop();   // ligne 1570 commence par le même son
       renderRoom();
-      setTimeout(()=>{ playLose(); }, 250);
+      playDeathSequence();   // impact + mélodie de mort
       lose();
       return true;
     }
@@ -366,13 +411,10 @@ function rockFalls(rx, ry){
 function moveMonster(dx,dy){
   if(state.gameOver || state.win || state.transitioning || state.demo) return;
 
-  // Décrément énergie (BASIC ligne 1360)
   state.tps--;
   if(state.tps <= 0){ renderRoom(); lose(); return; }
 
   const oldX = state.x, oldY = state.y;
-  // Test "pierre au-dessus" (FN y$) — équivaut à la variable tb du BASIC
-  // Note : dans le BASIC, monter met tb=0 explicitement (ligne 1040)
   const hasRockAbove = (dy !== -1) && (getCell(oldX, oldY - 1) === 'r');
   const nx = oldX + dx, ny = oldY + dy;
   const target = getCell(nx, ny);
@@ -396,35 +438,24 @@ function moveMonster(dx,dy){
     state.pom--;
   }
   else if(target === 'r'){
-    // Pousser la pierre (horizontal seulement) — BASIC 1340/1350
     if(dx !== 0){
       const bx = nx + dx;
       if(getCell(bx, ny) === ' '){
-        setCell(bx, ny, 'r');   // nouvelle position de la pierre
-        setCell(nx, ny, ' ');   // ancienne position devient vide
+        setCell(bx, ny, 'r');
+        setCell(nx, ny, ' ');
         state.x = nx; state.y = ny;
         moved = true;
         pushedRockX = bx;
         pushedRockY = ny;
-      } else {
-        // Push bloqué : dans le BASIC, tb reste à 1 et GOSUB 1280 est
-        // quand même appelé → le son "clac" retentit sur la position du joueur.
-        // Le rocher au-dessus (s'il y en a un) tombe.
-        playRockStop();
-        if(hasRockAbove){
-          if(rockFalls(oldX, oldY - 1)) return;
-        }
-        renderRoom();
-        return;
       }
     }
   }
 
-  // Priorité : pierre au-dessus qui tombe (comme GOSUB 1280 en BASIC)
+  // Priorité : pierre au-dessus qui tombe (BASIC ligne 1340/1350 GOSUB 1280)
   if(moved && hasRockAbove){
     if(rockFalls(oldX, oldY - 1)) return;
   }
-  // Sinon : la pierre poussée tombe
+  // Sinon : la pierre poussée tombe (BASIC 1340/1350 GOTO 1280)
   else if(moved && pushedRockX >= 0){
     if(rockFalls(pushedRockX, pushedRockY)) return;
   }
@@ -438,13 +469,17 @@ function moveMonster(dx,dy){
 
 function lose(){
   state.gameOver = true;
-  playLose();
+  // playDeathSequence() a déjà été appelé par rockFalls() ou par
+  // la fin d'énergie. Si c'est l'énergie, jouer la séquence ici.
+  if(state.tps <= 0 && !state.rockKilled){
+    playDeathSequence();
+  }
   ctx.fillStyle = PAL[0];
   ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = PAL[3];
   ctx.font = 'bold 28px monospace';
   ctx.fillText('Vous avez perdu !!!', 130, 200);
-  setTimeout(restart, 3000);
+  setTimeout(restart, 2500);
 }
 
 function win(){
@@ -471,6 +506,7 @@ function restart(){
   state.win = false;
   state.transitioning = false;
   state.demo = false;
+  state.rockKilled = false;
   loadRoom(0);
   renderRoom();
 }
