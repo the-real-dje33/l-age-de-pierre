@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>L'Age de Pierre - CPC 464</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;overflow:hidden;}
+  #wrap{display:flex;justify-content:center;align-items:center;height:100vh;background:#000;}
+  canvas{image-rendering:pixelated;background:#000;}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="screen" width="640" height="416"></canvas></div>
+<script>
+/* ================================================================
+   L'AGE DE PIERRE - CPC 464  ->  HTML/JS
+   ================================================================ */
+
+const canvas = document.getElementById('screen');
+const ctx = canvas.getContext('2d');
+
+const PAL = {
+  0: '#000000',
+  1: '#00c000',
+  2: '#ff0000',
+  3: '#ffff00'
+};
+
+/* ---------- SYMBOL (8x8) ---------- */
+const SYMBOLS = {
+  255: [0xCF,0xCF,0xCF,0x00,0xF3,0xF3,0xF3,0x00],
+  254: [0x7F,0xFF,0xC3,0xBF,0xBF,0xBF,0xBF,0xFF],
+  253: [0xFC,0xFE,0xFE,0xFE,0xFE,0xFE,0xFE,0xFE],
+  252: [0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x7F,0x00],
+  251: [0xFE,0xFE,0xFE,0xFE,0xFE,0xFE,0xFC,0x00],
+  250: [0x07,0x1F,0x3F,0x7F,0x7F,0xFF,0xFF,0xFF],
+  249: [0xE0,0xF8,0xFC,0xFE,0xFE,0xFF,0xFF,0xFF],
+  248: [0xFF,0xFF,0xCF,0x47,0x63,0x33,0x1F,0x07],
+  247: [0xFF,0xFF,0xFF,0xFE,0xFE,0xFC,0xF8,0xE0],
+  246: [0x07,0x09,0x0F,0x0F,0x07,0x01,0x0F,0x17],
+  245: [0xE0,0x90,0xF0,0xF0,0xE0,0x80,0xF0,0xE8],
+  244: [0x33,0x31,0x33,0x26,0x0C,0x18,0x0C,0x1C],
+  243: [0xCC,0x8C,0xCC,0x64,0x30,0x18,0x30,0x38]
+};
+
+// CHR$(207) : damier 1-pixel du CPC (vert/noir alterné)
+const HERBE = [0xAA,0x55,0xAA,0x55,0xAA,0x55,0xAA,0x55];
+
+const S     = 2;
+const CHAR  = 8 * S;
+const CELL  = CHAR * 2;
+
+/* ---------- Dessin ---------- */
+function drawBytes(bytes, px, py, color){
+  ctx.fillStyle = color;
+  for(let y=0;y<8;y++){
+    const b = bytes[y];
+    for(let x=0;x<8;x++){
+      if(b & (0x80>>x)) ctx.fillRect(px + x*S, py + y*S, S, S);
+    }
+  }
+}
+function drawSymbol(code, px, py, color){
+  if(SYMBOLS[code]) drawBytes(SYMBOLS[code], px, py, color);
+}
+
+function drawTile(ch, px, py){
+  if(ch === 'm'){
+    const c = PAL[2];
+    drawSymbol(255, px,        py,        c);
+    drawSymbol(255, px + CHAR, py,        c);
+    drawSymbol(255, px,        py + CHAR, c);
+    drawSymbol(255, px + CHAR, py + CHAR, c);
+  }
+  else if(ch === 'h'){
+    const c = PAL[1];
+    drawBytes(HERBE, px,        py,        c);
+    drawBytes(HERBE, px + CHAR, py,        c);
+    drawBytes(HERBE, px,        py + CHAR, c);
+    drawBytes(HERBE, px + CHAR, py + CHAR, c);
+  }
+  else if(ch === 'r'){
+    const c = PAL[3];
+    drawSymbol(254, px,        py,        c);
+    drawSymbol(253, px + CHAR, py,        c);
+    drawSymbol(252, px,        py + CHAR, c);
+    drawSymbol(251, px + CHAR, py + CHAR, c);
+  }
+  else if(ch === 'p'){
+    const c = PAL[2];
+    drawSymbol(250, px,        py,        c);
+    drawSymbol(249, px + CHAR, py,        c);
+    drawSymbol(248, px,        py + CHAR, c);
+    drawSymbol(247, px + CHAR, py + CHAR, c);
+  }
+}
+
+/* ---------- Salles ---------- */
+const ROOMS = [
+  { map:[
+    "mmmmmmmmmmmmmmmmmmmm",
+    "m hrhhmmmmrrrmrmmmrm",
+    "mhhhmpr mhhhhmp  hrm",
+    "mrrhmmp mp  h   m rm",
+    "mpphhhh mmm hmmrrhrm",
+    "mhhhhhh rhmphmphhhrm",
+    "mhmmmmmmrhmrrrrrrhrm",
+    "mhmhhhhhmmmmmmmmmhrm",
+    "mhmhphphprrrrrrrrhrm",
+    "mhr  hhhhphphphphhrm",
+    "mhrhphphprrrrrrrrrrm",
+    "mmmmmmmmmmmmmmmmmmmm"
+  ], pom:18, tps:150, x:2, y:2 },
+  { map:[
+    "mmmmmmmmmmmmmmmmmmmm",
+    "mrrmmmmmmmmmrrrrmrrm",
+    "m hmmmmmmmmmmmmhrprm",
+    "m hmmp p p  pppppprm",
+    "m hmm p p mmrrrhrprm",
+    "m hmmp p pmmrmmmrprm",
+    "mhhmmmmmmmmmrppmrprm",
+    "m hmmmmmmmmmmhrrmprm",
+    "mhhrrrhhhr  hhhhhprm",
+    "m hhhhhhhhmmrrrrrrrm",
+    "mhhrrrrrrrmmmmmmmmmm",
+    "mmmmmmmmmmmmmmmmmmmm"
+  ], pom:22, tps:80, x:2, y:3 },
+  { map:[
+    "mmmmmmmmmmmmmmmmmmmm",
+    "mm r  hr r mrmmr  rm",
+    "mmmpmmhhmh mprhhhhhm",
+    "m hhhhhrhr hhhmmm  m",
+    "mmmpmmhrhr mmmmrrm m",
+    "mm r  hrhr hhhhhhhpm",
+    "m hhhhhrhr mmmmmmmmm",
+    "mm r  hrhr rrrrrrrrm",
+    "mmmpmmhrhr hhhhhhhpm",
+    "mphhhhhrhr mmmmmmmmm",
+    "mrrrrrhrhr hhhhhhhpm",
+    "mmmmmmmmmm mmmmmmmmm"
+  ], pom:8, tps:150, x:2, y:4 },
+  { map:[
+    "mmmmmmmmmmmmmmmmmmmm",
+    "m hhhhhhrrrhhhhhhhhm",
+    "mhhhhhhhhhprmmmmmmhm",
+    "mphhhhhhrrhprmmmmmhm",
+    "mrphhhhhmmrhprmmmhhm",
+    "mrrphhhhhhmrhprmhphm",
+    "mrrrphhhpphmrhprmhhm",
+    "mrrrrphhmmphmrhprmmm",
+    "mrrrrrphppmphmrhprmm",
+    "mrrrrrrphhpmphmrhprm",
+    "mrrrrrrrmmhpmphhr hm",
+    "mmmmmmmmmmmmmmmmmmmm"
+  ], pom:26, tps:80, x:2, y:2 }
+];
+
+/* ---------- État ---------- */
+const state = {
+  room:0,
+  ecr:0,
+  map:[], pom:0, tps:0,
+  x:2, y:2, sc:0,
+  gameOver:false, win:false,
+  transitioning:false,
+  demo:false
+};
+
+/* ================================================================
+   AUDIO — Émulation AY-3-8912
+   ================================================================ */
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+}
+function tonePeriodToFreq(p){
+  if(p <= 0) return 0;
+  return 125000 / p;
+}
+function ayVolToGain(v){
+  return Math.min(1, v / 15);
+}
+
+function playAY(channel, toneP, durMs, vol, envStart, envStep, envSteps){
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  const freq = tonePeriodToFreq(toneP);
+  const totalDur = durMs / 1000;
+
+  const osc = audioCtx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.value = freq;
+
+  const gain = audioCtx.createGain();
+  // Boost global pour être bien audible
+  const baseVol = ayVolToGain(vol) * 1.4;
+  const startVol = ayVolToGain(envStart !== undefined ? envStart : vol);
+
+  gain.gain.setValueAtTime(startVol * baseVol, now);
+
+  if(envStep !== undefined && envSteps !== undefined){
+    const envN = envSteps;
+    const envStepMs = 10;
+    let v = startVol;
+    for(let i = 1; i <= envN; i++){
+      v = Math.max(0, v + (envStep/15));
+      gain.gain.linearRampToValueAtTime(
+        Math.max(0, v * baseVol),
+        now + i * envStepMs / 1000
+      );
+      if(v <= 0) break;
+    }
+  } else {
+    gain.gain.exponentialRampToValueAtTime(0.001, now + totalDur);
+  }
+  gain.gain.setValueAtTime(0, now + totalDur);
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + totalDur + 0.02);
+}
+
+// SOUND 129,50,100,7,1 -> manger (tone=50 -> 2500 Hz)
+function playEat(){
+  playAY(0, 50, 100, 7, 15, -100/127*15, 2);
+}
+
+// SOUND 130,200,100,7,1,2,5 -> clac de pierre / mort (tone=200 -> 625 Hz + bruit)
+function playRockStop(){
+  playAY(0, 200, 100, 7, 15, -100/127*15, 2);
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  const buf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.1), audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<data.length;i++){
+    data[i] = (Math.random()*2-1) * Math.exp(-i/data.length*5);
+  }
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const g = audioCtx.createGain();
+  g.gain.value = 0.25;
+  src.connect(g); g.connect(audioCtx.destination);
+  src.start(now);
+}
+
+// Séquence de mort (SOUND 1,i*100,10,... + SOUND 2,1000-i*100,10,...)
+function playLose(){
+  ensureAudio();
+  for(let i=1;i<=10;i++){
+    setTimeout(()=>{
+      playAY(0, i*100, 100, Math.max(1, Math.floor(i/3)));
+    }, i*80);
+    setTimeout(()=>{
+      playAY(1, 1000-i*100, 100, 7);
+    }, i*80 + 40);
+  }
+}
+
+/* ---------- Rendu ---------- */
+function renderRoom(){
+  ctx.fillStyle = PAL[0];
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  for(let row=0; row<12; row++){
+    const line = state.map[row] || "";
+    for(let col=0; col<20; col++){
+      drawTile(line[col] || ' ', col*CELL, row*CELL);
+    }
+  }
+  drawMonster();
+  drawHUD();
+}
+
+function drawMonster(){
+  const px = (state.x-1)*CELL;
+  const py = (state.y-1)*CELL;
+  const c  = PAL[3];
+  drawSymbol(246, px,        py,        c);
+  drawSymbol(245, px + CHAR, py,        c);
+  drawSymbol(244, px,        py + CHAR, c);
+  drawSymbol(243, px + CHAR, py + CHAR, c);
+}
+
+function drawHUD(){
+  ctx.fillStyle = PAL[3];
+  ctx.font = 'bold 20px monospace';
+  ctx.textBaseline = 'top';
+  const y = 12*CELL + 4;
+  ctx.fillText('SCORE:',   16,  y);
+  ctx.fillText(String(state.sc).padStart(4,' '), 110, y);
+  ctx.fillText('ENERGIE:', 240, y);
+  ctx.fillText(String(state.tps).padStart(3,' '), 360, y);
+  ctx.fillText('POMMES:',  470, y);
+  ctx.fillText(String(state.pom).padStart(2,' '), 580, y);
+}
+
+/* ---------- Logique ---------- */
+function loadRoom(idx){
+  const r = ROOMS[idx];
+  state.map = r.map.slice();
+  state.pom = r.pom;
+  state.tps = r.tps;
+  state.x = r.x;
+  state.y = r.y;
+}
+
+function getCell(x,y){
+  if(y<1||y>12||x<1||x>20) return 'm';
+  return (state.map[y-1]||'')[x-1] || ' ';
+}
+function setCell(x,y,ch){
+  if(y<1||y>12||x<1||x>20) return;
+  let line = state.map[y-1] || "";
+  state.map[y-1] = line.substring(0,x-1) + ch + line.substring(x);
+}
+
+function nextRoomOrWin(){
+  if(state.transitioning) return;
+  state.transitioning = true;
+  state.ecr++;
+
+  if(state.ecr >= 4){
+    setTimeout(()=>{
+      state.transitioning = false;
+      win();
+    }, 300);
+    return;
+  }
+
+  ctx.fillStyle = PAL[0];
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  setTimeout(()=>{
+    state.room++;
+    if(state.room >= 4) state.room = 3;
+    loadRoom(state.room);
+    state.transitioning = false;
+    renderRoom();
+  }, 400);
+}
+
+/* Fait tomber une pierre située en (rx, ry) tant qu'elle a de la place en dessous.
+   Joue le son d'impact "clac" quand la pierre s'arrête (BASIC ligne 1290).
+   Retourne true si le joueur a été écrasé. */
+function rockFalls(rx, ry){
+  // Boucle de chute (BASIC 1290-1330)
+  while(getCell(rx, ry + 1) === ' '){
+    setCell(rx, ry, ' ');
+    ry++;
+    setCell(rx, ry, 'r');
+    // Si la pierre atteint le joueur -> mort (BASIC 1320 -> 1570)
+    if(rx === state.x && ry === state.y){
+      playRockStop();   // ligne 1570 commence par le même son
+      renderRoom();
+      setTimeout(()=>{ playLose(); }, 250);
+      lose();
+      return true;
+    }
+  }
+  // La pierre s'arrête : son "clac" (BASIC ligne 1290)
+  playRockStop();
+  return false;
+}
+
+function moveMonster(dx,dy){
+  if(state.gameOver || state.win || state.transitioning || state.demo) return;
+
+  // Décrément énergie (BASIC ligne 1360)
+  state.tps--;
+  if(state.tps <= 0){ renderRoom(); lose(); return; }
+
+  const oldX = state.x, oldY = state.y;
+  // Test "pierre au-dessus" (FN y$) — équivaut à la variable tb du BASIC
+  // Note : dans le BASIC, monter met tb=0 explicitement (ligne 1040)
+  const hasRockAbove = (dy !== -1) && (getCell(oldX, oldY - 1) === 'r');
+  const nx = oldX + dx, ny = oldY + dy;
+  const target = getCell(nx, ny);
+  let moved = false;
+  let pushedRockX = -1, pushedRockY = -1;
+
+  if(target === ' '){
+    state.x = nx; state.y = ny; moved = true;
+  }
+  else if(target === 'h'){
+    state.x = nx; state.y = ny;
+    setCell(nx, ny, ' ');
+    moved = true;
+  }
+  else if(target === 'p'){
+    state.x = nx; state.y = ny;
+    setCell(nx, ny, ' ');
+    moved = true;
+    state.sc += 150;
+    playEat();
+    state.pom--;
+  }
+  else if(target === 'r'){
+    // Pousser la pierre (horizontal seulement) — BASIC 1340/1350
+    if(dx !== 0){
+      const bx = nx + dx;
+      if(getCell(bx, ny) === ' '){
+        setCell(bx, ny, 'r');   // nouvelle position de la pierre
+        setCell(nx, ny, ' ');   // ancienne position devient vide
+        state.x = nx; state.y = ny;
+        moved = true;
+        pushedRockX = bx;
+        pushedRockY = ny;
+      } else {
+        // Push bloqué : dans le BASIC, tb reste à 1 et GOSUB 1280 est
+        // quand même appelé → le son "clac" retentit sur la position du joueur.
+        // Le rocher au-dessus (s'il y en a un) tombe.
+        playRockStop();
+        if(hasRockAbove){
+          if(rockFalls(oldX, oldY - 1)) return;
+        }
+        renderRoom();
+        return;
+      }
+    }
+  }
+
+  // Priorité : pierre au-dessus qui tombe (comme GOSUB 1280 en BASIC)
+  if(moved && hasRockAbove){
+    if(rockFalls(oldX, oldY - 1)) return;
+  }
+  // Sinon : la pierre poussée tombe
+  else if(moved && pushedRockX >= 0){
+    if(rockFalls(pushedRockX, pushedRockY)) return;
+  }
+
+  renderRoom();
+
+  if(state.pom <= 0){
+    nextRoomOrWin();
+  }
+}
+
+function lose(){
+  state.gameOver = true;
+  playLose();
+  ctx.fillStyle = PAL[0];
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = PAL[3];
+  ctx.font = 'bold 28px monospace';
+  ctx.fillText('Vous avez perdu !!!', 130, 200);
+  setTimeout(restart, 3000);
+}
+
+function win(){
+  state.win = true;
+  ctx.fillStyle = PAL[0];
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = PAL[3];
+  ctx.font = 'bold 24px monospace';
+  ctx.fillText('* VOUS AVEZ GAGNE *', 130, 100);
+  ctx.font = '16px monospace';
+  ctx.fillText('Vous etes le premier qui ait reussi cet exploit.', 60, 160);
+  ctx.fillText('Nous nous souviendrons de vous comme etant', 60, 185);
+  ctx.fillText("LE SEUL hero de l'histoire !", 60, 210);
+  ctx.fillText('Votre score: ' + state.sc, 60, 250);
+  ctx.fillText('Une touche pour rejouer...', 60, 300);
+  setTimeout(restart, 5000);
+}
+
+function restart(){
+  state.room = 0;
+  state.ecr  = 0;
+  state.sc   = 0;
+  state.gameOver = false;
+  state.win = false;
+  state.transitioning = false;
+  state.demo = false;
+  loadRoom(0);
+  renderRoom();
+}
+
+/* ---------- Clavier ---------- */
+document.addEventListener('keydown', e=>{
+  ensureAudio();
+  if(state.gameOver || state.win || state.transitioning || state.demo) return;
+
+  if(e.key==='ArrowUp'){         e.preventDefault(); moveMonster(0,-1); }
+  else if(e.key==='ArrowDown'){  e.preventDefault(); moveMonster(0,1);  }
+  else if(e.key==='ArrowLeft'){  e.preventDefault(); moveMonster(-1,0); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); moveMonster(1,0);  }
+  else if(e.key==='d' || e.key==='D'){
+    state.demo = true;
+    state.transitioning = true;
+    let z = 0;
+    function demoNext(){
+      if(z >= 4){
+        state.demo = false;
+        state.transitioning = false;
+        restart();
+        return;
+      }
+      loadRoom(z);
+      renderRoom();
+      z++;
+      setTimeout(demoNext, 600);
+    }
+    demoNext();
+  }
+});
+
+/* ---------- Démarrage ---------- */
+loadRoom(0);
+renderRoom();
+
+setTimeout(()=>{
+  ctx.fillStyle = PAL[0];
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = PAL[3];
+  ctx.font = 'bold 24px monospace';
+  ctx.fillText("L'AGE DE PIERRE", 190, 60);
+  ctx.font = '14px monospace';
+  ctx.fillText("LE BUT DU JEU: Vous devez au travers de 4 salles guider", 40, 130);
+  ctx.fillText("un personnage dont la seule raison d'etre est de ramasser", 40, 152);
+  ctx.fillText("les fruits rouges tapissant le sol.", 40, 174);
+  ctx.fillText("DEROULEMENT: Fleches du curseur. Chaque deplacement", 40, 214);
+  ctx.fillText("coute 1 point d'energie. Si energie = 0, vous mourez.", 40, 236);
+  ctx.fillText("Les pierres tombent si vous passez dessous.", 40, 266);
+  ctx.fillText("Vous pouvez pousser une pierre s'il y a de la place.", 40, 288);
+  ctx.fillText("Terminez les 4 salles pour gagner !", 40, 328);
+  setTimeout(renderRoom, 3500);
+}, 100);
+</script>
+</body>
+</html>
